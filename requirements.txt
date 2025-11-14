@@ -1,0 +1,7 @@
+authlib
+aiosqlite
+fastapi[standard]
+orjson
+pwdlib[argon2]
+pytest
+sqlalchemy
