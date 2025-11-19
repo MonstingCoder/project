@@ -4,4 +4,5 @@ fastapi[standard]
 orjson
 pwdlib[argon2]
 pytest
+python-dotenv
 sqlalchemy

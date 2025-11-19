@@ -1,10 +1,19 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import ORJSONResponse, RedirectResponse
+from .routers import auth, users
 
 
-app = FastAPI(default_response_class=ORJSONResponse)
+async def lifespan(app: FastAPI):
+    from .database import conn
+    await conn.init_db()
+    yield
 
+
+app = FastAPI(default_response_class=ORJSONResponse, lifespan=lifespan)
+
+app.include_router(auth.router)
+app.include_router(users.router)
 app.mount(
     r'/static',
     StaticFiles(directory=r'app/static'),
