@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from fastapi import Path
 from pwdlib import PasswordHash
 from pydantic import (
     AwareDatetime,
@@ -95,4 +96,3 @@ class UserUpdate(BaseModel):
     @computed_field
     def updated_at(cls) -> AwareDatetime:
         return get_time_now()
-    

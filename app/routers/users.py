@@ -27,6 +27,26 @@ async def read_users(
 
     return data.scalars()
 
+@router.get('/{id}', response_model=models.UserPublic)
+@default_e_h()
+async def read_user(
+    *,
+    id: Annotated[int, Path(ge=0)],
+    session: conn.SessionDep,
+):
+    data = await session.get(models.User, id)
+    if not data:
+        print('ok')
+        detail = {
+            'status': status.HTTP_404_NOT_FOUND,
+            'message': 'user not found',
+            'value': data
+        }
+        
+        raise ValueError(detail)
+    
+    return data
+
 
 @router.post('/', response_model=models.UserPublic)
 @default_e_h()
@@ -48,18 +68,39 @@ async def create_user(
 @default_e_h()
 async def update_user(
     *,
-    id: Annotated[int, Path(ge=1)],
+    id: Annotated[int, Path(ge=0)],
     payload: models.UserUpdate,
-    session: conn.SessionDep
+    session: conn.SessionDep,
 ):
     data = await session.get(models.User, id)
     if not data:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail='user not found')
+        print('ok')
+        detail = {
+            'status': status.HTTP_404_NOT_FOUND,
+            'message': 'user not found',
+            'value': data
+        }
+        
+        raise ValueError(detail)
     
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(data, field, value)
-    session.add(data)
+
     await session.commit()
     await session.refresh(data)
+
+    return data
+
+@router.delete('/{id}', response_model=models.UserPublic)
+@default_e_h()
+async def delete_user(
+    *,
+    id: Annotated[int, Path(ge=0)],
+    session: conn.SessionDep
+):
+    data = await session.get(models.User, id)
+
+    await session.delete(data)
+    await session.commit()
 
     return data
