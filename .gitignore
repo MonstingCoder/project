@@ -3,3 +3,5 @@ old/
 secret/
 *.db
 *.log
+app/main.py
+app/main.py

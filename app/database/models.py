@@ -1,98 +1,98 @@
-from datetime import datetime, timezone
-from fastapi import Path
-from pwdlib import PasswordHash
-from pydantic import (
-    AwareDatetime,
-    AfterValidator,
-    BaseModel,
-    BeforeValidator,
-    computed_field,
-    EmailStr,
+from sqlmodel import (
     Field,
+    SQLModel,
+    Relationship,
 )
-from sqlalchemy import Column
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.dialects.sqlite import INTEGER, TEXT
-from typing import Annotated, Literal
-import re
+from uuid import uuid4
 
+class Ability_Crew(SQLModel, table=True):
+    crew_id: int = Field(
+        foreign_key='crew.id',
+        primary_key=True,
+        ondelete='CASCADE',
+    )
+    ability_id: int = Field(
+        foreign_key='ability.id',
+        primary_key=True,
+        ondelete='CASCADE',
+    )
 
-argon2 = PasswordHash.recommended()
-Base = declarative_base()
+class Item_Transaction(SQLModel, table=True):
+    item_id: int = Field(
+        foreign_key='item.id',
+        primary_key=True,
+        ondelete='CASCADE',
+    )
+    transaction_id: str = Field(
+        foreign_key='transaction.id',
+        primary_key=True,
+        ondelete='CASCADE',
+    )
+    quantity: int
 
-def get_time_now():
-    return datetime.now(timezone.utc)
+    items: 'Item' = Relationship(back_populates='item_transactions')
+    transactions: 'Transaction' = Relationship(back_populates='item_transactions')
 
-def password_hash_aval(v):
-    if v is None:
-        return None
-    
-    if not re.match(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*\W).+$', v):
-        raise ValueError('passwords must contain a combination of uppercase letters, lowercase letters, symbols, and numbers')
-    
-    return argon2.hash(v)
+class Ability(SQLModel, table=True):
+    id: int | None = Field(
+        default=None, primary_key=True,
+    )
+    name: str
 
-def phone_number_bval(v):
-    if v is None:
-        return None
-    
-    if not re.match(r'^08\d+$', v):
-        raise ValueError('phone number must start with the number 08')
-    
-    return v
-    
+    crews: list['Crew'] = Relationship(
+        back_populates='abilities', link_model=Ability_Crew,
+    )
 
-class User(Base):
-    __tablename__ = 'user'
+class Crew(SQLModel, table=True):
+    id: int | None = Field(
+        default=None, primary_key=True,
+    )
+    name: str = Field(
+        index=True, unique=True,
+    )
+    password_hash: str
 
-    id = Column(INTEGER, primary_key=True)
-    role = Column(TEXT, nullable=False)
-    username = Column(TEXT, index=True, nullable=False)
-    password_hash = Column(TEXT, nullable=False)
-    phone_number = Column(TEXT, nullable=False, unique=True)
-    email = Column(TEXT, nullable=False, unique=True)
-    created_at = Column(TEXT, nullable=False)
-    updated_at = Column(TEXT)
+    abilities: list[Ability] = Relationship(
+        back_populates='crews', link_model=Ability_Crew,
+    )
 
-class UserPublic(BaseModel):
-    role: str
-    username: str
+class Item_Category(SQLModel, table=True):
+    id: int | None = Field(
+        default=None, primary_key=True,
+    )
+    name: str = Field(index=True)
+
+    items: list['Item'] = Relationship(back_populates='item_category')
+
+class Item(SQLModel, table=True):
+    id: int | None = Field(
+        default=None, primary_key=True,
+    )
+    name: str = Field(index=True)
+    category: int = Field(foreign_key='item_category.id')
+    description: str
+    price: int
+
+    item_category: Item_Category | None = Relationship(back_populates='items')
+    item_image_paths: list['Item_Image_Path'] = Relationship(back_populates='item')
+    item_transactions: list[Item_Transaction] = Relationship(back_populates='items')
+
+class Item_Image_Path(SQLModel, table=True):
+    id: int | None = Field(
+        default=None, primary_key=True,
+    )
+    path: str
+    item_id: int = Field(foreign_key='item.id')
+
+    item: Item | None = Relationship(back_populates='item_image_paths')
+
+class Transaction(SQLModel, table=True):
+    id: str | None = Field(
+        default_factory=uuid4, primary_key=True
+    )
+    name: str = Field(index=True)
     email: str
     phone_number: str
-    created_at: AwareDatetime
-    updated_at: AwareDatetime | None
+    created_at: str
 
-class UserCreate(BaseModel):
-    role: Literal['user'] = 'user'
-    username: Annotated[str, Field(max_length=25)]
-    password_hash: Annotated[
-        str,
-        Field(alias='password', min_length=8),
-        AfterValidator(password_hash_aval),
-    ]
-    email: EmailStr
-    phone_number: Annotated[
-        str,
-        Field(max_length=13, min_length=10),
-        BeforeValidator(phone_number_bval),
-    ]
-    @computed_field
-    def created_at(cls) -> AwareDatetime:
-        return get_time_now()
-    
-class UserUpdate(BaseModel):
-    username: Annotated[str | None, Field(max_length=25)] = None
-    password_hash: Annotated[
-        str | None,
-        Field(alias='password', min_length=8),
-        AfterValidator(password_hash_aval),
-    ] = None
-    email: EmailStr | None = None
-    phone_number: Annotated[
-        str | None,
-        Field(max_length=13, min_length=10),
-        BeforeValidator(phone_number_bval),
-    ] = None
-    @computed_field
-    def updated_at(cls) -> AwareDatetime:
-        return get_time_now()
+    item_transactions: list[Item_Transaction] = Relationship(back_populates='transactions')
