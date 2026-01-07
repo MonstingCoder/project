@@ -1,4 +1,5 @@
 from authlib.jose import jwt
+from collections import defaultdict
 from datetime import (
     datetime,
     timedelta,
@@ -16,62 +17,93 @@ from fastapi.security import (
 )
 from os import getenv
 from pwdlib import PasswordHash
-from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from typing import Annotated, Literal
 from ..database.conn import SessionDep
-from ..database.models import Ability, Crew
+from ..database.model import (
+    Ability,
+    Ability_Crew,
+    Crew,
+)
+
 
 load_dotenv(r'app/secret/.env')
-router = APIRouter(prefix='/token', tags=['token'])
 
-hasher = PasswordHash.recommended()
+router = APIRouter(prefix='/token', tags=['token'])
 jwt_config = {
     'key': getenv('JWT_KEY'),
     'algorithm': 'HS256',
-    'expire_minute': 20,
+    'expire_minute': 10,
 }
 
+
 FormData = Annotated[OAuth2PasswordRequestForm, Depends()]
+hasher = PasswordHash.recommended()
 
 @router.post('/crew')
 async def get_crew_token(
     form_data: FormData, session: SessionDep,
 ):
-    # get crew :
-    crew = await session.scalar(
-        select(Crew)
-        .options(selectinload(Crew.abilities))
-        .where(Crew.name == form_data.username)
-    )
+    try:
+        # get crew :
+        crew = (await session.scalar(
+            select(Crew).where(Crew.name == form_data.username)
+        ))
+        
+        # authenticate crew :
+        if not crew:
+            detail = f'user {form_data.username} not found'
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, detail,
+            )
+        
+        if not hasher.verify(
+            form_data.password, crew.password_hash,
+        ):
+            detail = 'wrong password'
+            raise HTTPException(
+                status.HTTP_401_UNAUTHORIZED, detail,
+            )
+        
+        # get crew's abilities :
+        abilities = (await session.execute(
+            select(Ability.name)
+            .select_from(Ability_Crew)
+            .where(Ability_Crew.crew_id == crew.id)
+            .join(Ability, Ability_Crew.ability_id == Ability.id)
+        )).mappings().all()
 
-    # authenticate crew:
-    if not crew:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, detail=f'user {form_data.username} not found',
-        )
-    if not hasher.verify(
-        form_data.password, crew.password_hash,
-    ):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, detail='wrong password',
-        )
-    
-    # jwt :
-    token = jwt.encode(
-        {'alg': jwt_config['algorithm']},
-        {
+        # make jws :
+        header = {'alg': jwt_config['algorithm']}
+        payload = {
             'sub': crew.id,
-            'abilities': [ability.name for ability in crew.abilities],
             'exp': datetime.now(timezone.utc) + timedelta(minutes=jwt_config['expire_minute']),
-        },
-        jwt_config['key'],
-    )
+            'abilities': [i['name'] for i in abilities],
+        }
+        token = jwt.encode(
+            header,
+            payload,
+            jwt_config['key'],
+        )
+        jws = {
+            'type': 'bearer',
+            'token': token
+        }
 
-    return {
-        'type': 'bearer',
-        'token': token,
-    }
+        return jws
+    
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        detail = {
+            'status': type(e).__name__,
+            'message': str(e),
+        }
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail,
+        )
+
 
 crew_oauth2_scheme = OAuth2PasswordBearer(tokenUrl='token/crew')
 CrewToken = Annotated[str, Depends(crew_oauth2_scheme)]
