@@ -57,7 +57,7 @@ async def read_items(
     result = result.mappings().all()
 
     if not result:
-        raise HTTPException(status.HTTP_404_NOT_FOUND)
+        return []
     
     data = []
     for row in result:
@@ -122,20 +122,13 @@ async def read_item(
 async def create_item(
     *,
     current_crew: CurrentCrew,
-    data: ItemCreate,
+    item: ItemCreate,
     session: SessionDep,
 ):
     try :
         if 'manage-item' not in current_crew['abilities']:
             raise HTTPException(status.HTTP_403_FORBIDDEN)
         
-        item = ItemCreate(
-            name=data.name,
-            category_id=data.category_id,
-            description=data.description,
-            price=data.price,
-            quantity=data.quantity,
-        )
         item = Item.model_validate(item)
 
         session.add(item)
@@ -255,7 +248,7 @@ async def add_images(
         
         # save in database :
         image_path = ItemImagePathCreate(
-            path=fr'static/images/{image_name}', item_id=item.id,
+            path=fr'/static/images/{image_name}', item_id=item.id,
         )
         image_path = Item_Image_Path.model_validate(image_path)
 

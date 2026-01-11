@@ -1,13 +1,14 @@
 from pydantic import (
     AfterValidator,
     BeforeValidator,
-    EmailStr
+    EmailStr,
+    SecretStr,
 )
 from datetime import datetime, timezone
 from pwdlib import PasswordHash
 from sqlmodel import Field, SQLModel
 from typing import Annotated, Literal
-from uuid import uuid4
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 import re
@@ -40,7 +41,7 @@ class ItemTransactionCreate(SQLModel):
         primary_key=True,
         ondelete='CASCADE',
     )
-    transaction_id: str = Field(
+    transaction_id: UUID = Field(
         foreign_key='transaction.id',
         primary_key=True,
         ondelete='CASCADE',
@@ -183,7 +184,10 @@ def get_time_now():
     return now_wib
 
 class TrasactionCreate(SQLModel):
-    name: str = Field(index=True)
+    name: str = Field(
+        index=True,
+        min_length=1,
+    )
     email: EmailStr
     phone_number: Annotated[
         str,
@@ -194,13 +198,21 @@ class TrasactionCreate(SQLModel):
     ]
 
 class Transaction(TrasactionCreate, table=True):
-    id: str | None = Field(
+    id: UUID | None = Field(
         default_factory=uuid4, primary_key=True
     )
-    email: str = Field(
-        index=True, unique=True,
-    )
+    email: str = Field(index=True)
     phone_number: str
-    verified: bool | None = None
+    confirmed: bool | None = None
     created_at: str = Field(default_factory=get_time_now)
     updated_at: str | None = None
+
+
+class PaymentProofCreate(SQLModel):
+    transaction_id: UUID = Field(index=True)
+    image_path: str
+
+class Payment_Proof(PaymentProofCreate, table=True):
+    id: int | None = Field(
+        default=None, primary_key=True,
+    )

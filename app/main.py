@@ -5,6 +5,7 @@ from fastapi.responses import ORJSONResponse, RedirectResponse
 from .routers import (
     crew,
     item,
+    payment_proof,
     token,
     transaction,
 )
@@ -22,6 +23,7 @@ app = FastAPI(
 
 app.include_router(crew.router)
 app.include_router(item.router)
+app.include_router(payment_proof.router)
 app.include_router(token.router)
 app.include_router(transaction.router)
 app.mount(

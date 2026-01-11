@@ -1,0 +1,14 @@
+cara install uv:
+- windows: powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+- linux: curl -LsSf https://astral.sh/uv/install.sh | sh
+- macos: brew install uv
+- lalu jalankan uv --version
+
+cara run :
+- masuk ke direktori jaws-custom
+- jalankan: uv run fastapi run
+- akses dokumentasi: localhost:8000/docs
+- akses fitur: localhost:8000
+
+jika error :
+- minta file .env ke backend
