@@ -103,7 +103,7 @@ def get_payment_email(data: dict, upload_link: str, referral_code: UUID):
                   padding:8px;
                   font-family:monospace;
                 ">
-                  {str(referral_code)[:8].upper()}
+                  {referral_code}
                 </div>
               </td>
             </tr>

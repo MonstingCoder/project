@@ -140,60 +140,128 @@ async def create_transaction(
     data: TransactionModel,
     
     background_tasks: BackgroundTasks,
-    request: Request,
     session: SessionDep,
 ):
-    transaction = TrasactionCreate(
-        name=data.name,
-        email=data.email,
-        phone_number=data.phone_number,
-    )
-    transaction = Transaction.model_validate(transaction)
+    requested_item_ids = [item.item_id for item in data.item_detail]
 
-    session.add(transaction)
-    await session.commit()
-
-    item_ids = []
-    item_quantities = []
-    for item_transaction in data.item_detail:
-        item_transaction = ItemTransactionCreate(
-            item_id=item_transaction.item_id,
-            transaction_id=transaction.id,
-            quantity=item_transaction.quantity,
+    async with session.begin():
+        # item validation :
+        statement = (
+            select(Item)
+            .where(Item.id.in_(requested_item_ids))
+            .with_for_update()
         )
-        item_transaction = Item_Transaction.model_validate(item_transaction)
-
-        session.add(item_transaction)
-        item_ids.append(item_transaction.item_id)
-        item_quantities.append(item_transaction.quantity)
+        result = await session.scalars(statement)
+        items = {item.id: item for item in result.all()}
+    if len(items) != len(requested_item_ids):
+        detail = 'salah satu item tidak ditemukan'
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail)
     
-    await session.commit()
+    # stock validation :
+    for item_req in data.item_detail:
+        item = items[item_req.item_id]
+        if item_req.quantity > item.quantity:
+            detail = f'permintaan untuk {item.name} melebihi stok yang tersedia'
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail)
+    
+    # atomic transaction :
+    async with session.begin():
+        transaction = Transaction(
+            name=data.name,
+            email=data.email,
+            phone_number=data.phone_number,
+        )
+        session.add(transaction)
+        await session.flush()  # supaya transaction.id tersedia
 
-    items = select(Item.name, Item.price).where(Item.id.in_(item_ids))
-    items = await session.execute(items)
-    items = items.mappings().all()
+        detail_transaction = {
+            "items": [],
+            "total": 0,
+        }
 
-    detail_transaction = {
-        'items': [],
-        'total': 0,
-    }
-    for i, j in enumerate(item_ids):
-        detail_transaction['items'].append({
-            'name': items[i]['name'],
-            'price': items[i]['price'],
-            'quantity': item_quantities[i],
-        })
-        detail_transaction['total'] += items[i]['price'] * item_quantities[i]
+        for item_req in data.item_detail:
+            item = items[item_req.item_id]
+
+            # Simpan item transaksi
+            item_tx = Item_Transaction(
+                item_id=item.id,
+                transaction_id=transaction.id,
+                quantity=item_req.quantity,
+            )
+            session.add(item_tx)
+
+            # Kurangi stok
+            item.quantity -= item_req.quantity
+
+            subtotal = item.price * item_req.quantity
+            detail_transaction["items"].append({
+                "name": item.name,
+                "price": item.price,
+                "quantity": item_req.quantity,
+            })
+            detail_transaction["total"] += subtotal
     
     background_tasks.add_task(
         send_payment_email,
         data.email,
         detail_transaction,
-        getenv('PAYMENT_PROOF_URL'),
+        getenv("PAYMENT_PROOF_URL"),
         transaction.id,
     )
 
-    return {'referral_code': transaction.id}
+    return {"referral_code": transaction.id}
+
+    # transaction = TrasactionCreate(
+    #     name=data.name,
+    #     email=data.email,
+    #     phone_number=data.phone_number,
+    # )
+    # transaction = Transaction.model_validate(transaction)
+
+    # session.add(transaction)
+    # await session.commit()
+
+    # item_ids = []
+    # item_quantities = []
+    # for item_transaction in data.item_detail:
+    #     item_transaction = ItemTransactionCreate(
+    #         item_id=item_transaction.item_id,
+    #         transaction_id=transaction.id,
+    #         quantity=item_transaction.quantity,
+    #     )
+    #     item_transaction = Item_Transaction.model_validate(item_transaction)
+
+    #     session.add(item_transaction)
+    #     item_ids.append(item_transaction.item_id)
+    #     item_quantities.append(item_transaction.quantity)
+    
+    # await session.commit()
+
+    # items = select(Item.name, Item.price).where(Item.id.in_(item_ids))
+    # items = await session.execute(items)
+    # items = items.mappings().all()
+
+    # detail_transaction = {
+    #     'items': [],
+    #     'total': 0,
+    # }
+    # for i, j in enumerate(item_ids):
+    #     detail_transaction['items'].append({
+    #         'name': items[i]['name'],
+    #         'price': items[i]['price'],
+    #         'quantity': item_quantities[i],
+    #     })
+    #     detail_transaction['total'] += items[i]['price'] * item_quantities[i]
+    
+    # background_tasks.add_task(
+    #     send_payment_email,
+    #     data.email,
+    #     detail_transaction,
+    #     getenv('PAYMENT_PROOF_URL'),
+    #     transaction.id,
+    # )
+
+    # return {'referral_code': transaction.id}
 
 
 @router.patch('/')

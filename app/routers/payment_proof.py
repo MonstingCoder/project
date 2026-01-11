@@ -79,6 +79,7 @@ async def upload_payment_proof(
         detail = 'transaction not found'
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail)
     
+    # PERHATIKAN BAGIAN INI ! ! !
     if transaction.confirmed is not None:
         detail = 'your transaction has been confirmed,' \
         'please chechk your email.'

@@ -121,10 +121,18 @@ async def read_item(
 @router.post('/')
 async def create_item(
     *,
-    current_crew: CurrentCrew,
     item: ItemCreate,
+
+    current_crew: CurrentCrew,
     session: SessionDep,
 ):
+    '''
+    catatan :\n
+    accessory\t: 1\n
+    body\t: 2\n
+    core\t: 3\n
+    
+    '''
     try :
         if 'manage-item' not in current_crew['abilities']:
             raise HTTPException(status.HTTP_403_FORBIDDEN)
@@ -274,7 +282,8 @@ async def delete_image(
     
     image = await session.get(Item_Image_Path, {'id': image_id})
     if not image:
-        raise HTTPException(status.HTTP_404_NOT_FOUND)
+        detail = 'image not found'
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail)
     
     await session.delete(image)
     await session.commit()

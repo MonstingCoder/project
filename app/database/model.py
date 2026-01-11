@@ -2,7 +2,6 @@ from pydantic import (
     AfterValidator,
     BeforeValidator,
     EmailStr,
-    SecretStr,
 )
 from datetime import datetime, timezone
 from pwdlib import PasswordHash
@@ -54,6 +53,12 @@ class Item_Transaction(ItemTransactionCreate, table=True):
     pass
 
 
+'''
+CATATAN :
+- ABILITY manage-account ADALAH KEMAMPUAN KHUSUS UNTUK AKUN OWNER DAN CREW TERTINGGI
+- HAPUS ABILITY give-permission DI PATCH SELANJUTNYA
+
+'''
 class AbilityCreate(SQLModel):
     name: Literal[
         'confirm-payment',  # id: 1
@@ -101,7 +106,7 @@ class ItemCategoryCreate(SQLModel):
     name: Literal[
         'accessory',    # id: 1
         'body',         # id: 2
-        'internal',     # id: 3
+        'core',         # id: 3
     ]
 
 class Item_Category(ItemCategoryCreate, table=True):
@@ -122,7 +127,7 @@ class ItemCreate(SQLModel):
     category_id: Annotated[Literal[
         1, # category: accessory
         2, # category: body
-        3, # category: internal
+        3, # category: core
     ], BeforeValidator(int)]
     description: str | None = Field(
         default=None, max_length=400

@@ -59,7 +59,7 @@ async def init_db():
             item_categories = [
                 ItemCategoryCreate(name='accessory'),
                 ItemCategoryCreate(name='body'),
-                ItemCategoryCreate(name='internal'),
+                ItemCategoryCreate(name='core'),
             ]
             item_categories = [Item_Category.model_validate(item_category) for item_category in item_categories]
 
