@@ -17,6 +17,7 @@ from ..database.model import (
     ItemImagePathCreate, Item_Image_Path,
     Item_Category,
 )
+import json
 
 router = APIRouter(
     prefix='/item', tags=['item'],
@@ -45,8 +46,12 @@ async def read_items(
             statement.c.description,
             Item_Category.id.label('category_id'),
             Item_Category.name.label('category'),
-            func.group_concat(Item_Image_Path.id, ',').label('image_id'),
-            func.group_concat(Item_Image_Path.path, ',').label('path'),
+            func.json_group_array(
+                func.json_object(
+                    'id', Item_Image_Path.id,
+                    'path', Item_Image_Path.path,
+                )
+            ).label('image'),
         )
         .select_from(statement)
         .outerjoin(Item_Category, statement.c.category_id == Item_Category.id)
@@ -59,19 +64,12 @@ async def read_items(
     if not result:
         return []
     
-    data = []
-    for row in result:
-        row = dict(row)
+    for i, j in enumerate(result):
+        j = dict(j)
+        j['image'] = json.loads(j['image'])
+        result[i] = j
 
-        if row['image_id']:
-            row['image_id'] = [int(i) for i in row['image_id'].split(',')]
-
-        if row['path']:
-            row['path'] = row['path'].split(',')
-
-        data.append(row)
-
-    return data
+    return result
 
 
 @router.get('/{item_id}')
@@ -89,8 +87,12 @@ async def read_item(
             Item.description,
             Item_Category.id.label('category_id'),
             Item_Category.name.label('category'),
-            func.group_concat(Item_Image_Path.id, ',').label('image_id'),
-            func.group_concat(Item_Image_Path.path, ',').label('path'),
+            func.json_group_array(
+                func.json_object(
+                    'id', Item_Image_Path.id,
+                    'path', Item_Image_Path.path,
+                )
+            ).label('image'),
         )
         .select_from(Item)
         .outerjoin(Item_Category, Item.category_id == Item_Category.id)
@@ -108,12 +110,7 @@ async def read_item(
         )
     
     item = dict(item)
-
-    if item['image_id']:
-        item['image_id'] = [int(i) for i in item['image_id'].split(',')]
-    
-    if item['path']:
-        item['path'] = item['path'].split(',')
+    item['image'] = json.loads(item['image'])
 
     return item
 

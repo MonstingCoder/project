@@ -1,20 +1,24 @@
 from collections import defaultdict
 from fastapi import (
     APIRouter,
-    Body,
     HTTPException,
     Query,
     status,
 )
+from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import func, select
+from sqlmodel import (
+    delete,
+    func,
+    select,
+)
 from typing import Annotated, Literal
 from .token import CurrentCrew
 from ..database.conn import SessionDep
 from ..database.model import (
     Ability,
-    Ability_Crew, AbilityCrewCreate,
-    Crew, CrewCreate,
+    Ability_Crew, AbilityCrewCreate, AbilityCrewUpdate,
+    Crew, CrewCreate, CrewUpdate,
 )
 import json
 
@@ -22,6 +26,11 @@ import json
 router = APIRouter(
     prefix='/crew', tags=['crew'],
 )
+ability_map = {
+    'confirm-payment': 1,  # id: 1
+    'manage-account': 2,   # id: 3
+    'manage-item': 3,      # id: 4
+}
 
 
 @router.get('/')
@@ -110,12 +119,6 @@ async def read_crew(
     return {'crew': crew}
 
 
-ability_map = {
-    'confirm-payment': 1,  # id: 1
-    'manage-account': 3,   # id: 3
-    'manage-item': 4,      # id: 4
-}
-
 @router.post('/')
 async def create_crew(
     *,
@@ -165,3 +168,72 @@ async def create_crew(
             session.add(ability)
     
     return {'success': True}
+
+
+@router.put('/{crew_id}')
+async def update_crew(
+    *,
+    crew_id: int,
+    crew_data: CrewUpdate,
+    abilities: set[Literal[
+        'confirm-payment',  # id: 1
+        'manage-account',   # id: 2
+        'manage-item',      # id: 3
+    ]],
+
+    current_crew: CurrentCrew,
+    session: SessionDep,
+):
+    if 'manage-account' not in current_crew['abilities']:
+        raise HTTPException(status.HTTP_403_FORBIDDEN)
+    
+    crew = await session.get(Crew, crew_id)
+    if not crew:
+        detail = 'crew not found'
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail)
+    
+    # update crew :
+    crew_data = crew_data.model_dump(exclude_unset=True)
+    crew.sqlmodel_update(crew_data)
+
+    if not abilities:
+        return {'success': True}
+
+    # delete old abilities :
+    statement = delete(Ability_Crew).where(Ability_Crew.crew_id == crew_id)
+    await session.execute(statement)
+
+    # add new abilities :
+    for ability in abilities:
+        ability = AbilityCrewCreate(
+            crew_id=crew_id, ability_id=ability_map[ability],
+        )
+        ability = Ability_Crew.model_validate(ability)
+
+        session.add(ability)
+    
+    await session.commit()
+
+    return {'success': True}
+
+
+@router.delete('/{crew_id}')
+async def remove_crew(
+    *,
+    crew_id: int,
+
+    current_crew: CurrentCrew,
+    session: SessionDep,
+):
+    if 'manage-account' not in current_crew['abilities']:
+        raise HTTPException(status.HTTP_403_FORBIDDEN)
+    
+    crew = await session.get(Crew, crew_id)
+    if not crew:
+        detail = 'crew not found'
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail)
+    
+    await session.delete(crew)
+    await session.commit()
+
+    return {f'success': True}

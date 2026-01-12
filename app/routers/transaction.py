@@ -211,58 +211,6 @@ async def create_transaction(
 
     return {"referral_code": transaction.id}
 
-    # transaction = TrasactionCreate(
-    #     name=data.name,
-    #     email=data.email,
-    #     phone_number=data.phone_number,
-    # )
-    # transaction = Transaction.model_validate(transaction)
-
-    # session.add(transaction)
-    # await session.commit()
-
-    # item_ids = []
-    # item_quantities = []
-    # for item_transaction in data.item_detail:
-    #     item_transaction = ItemTransactionCreate(
-    #         item_id=item_transaction.item_id,
-    #         transaction_id=transaction.id,
-    #         quantity=item_transaction.quantity,
-    #     )
-    #     item_transaction = Item_Transaction.model_validate(item_transaction)
-
-    #     session.add(item_transaction)
-    #     item_ids.append(item_transaction.item_id)
-    #     item_quantities.append(item_transaction.quantity)
-    
-    # await session.commit()
-
-    # items = select(Item.name, Item.price).where(Item.id.in_(item_ids))
-    # items = await session.execute(items)
-    # items = items.mappings().all()
-
-    # detail_transaction = {
-    #     'items': [],
-    #     'total': 0,
-    # }
-    # for i, j in enumerate(item_ids):
-    #     detail_transaction['items'].append({
-    #         'name': items[i]['name'],
-    #         'price': items[i]['price'],
-    #         'quantity': item_quantities[i],
-    #     })
-    #     detail_transaction['total'] += items[i]['price'] * item_quantities[i]
-    
-    # background_tasks.add_task(
-    #     send_payment_email,
-    #     data.email,
-    #     detail_transaction,
-    #     getenv('PAYMENT_PROOF_URL'),
-    #     transaction.id,
-    # )
-
-    # return {'referral_code': transaction.id}
-
 
 @router.patch('/')
 async def change_status(

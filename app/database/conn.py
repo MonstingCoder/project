@@ -43,7 +43,6 @@ async def init_db():
         if not ability:
             abilities = [
                 AbilityCreate(name='confirm-payment'),
-                AbilityCreate(name='give-permission'),
                 AbilityCreate(name='manage-account'),
                 AbilityCreate(name='manage-item'),
             ]
@@ -88,7 +87,7 @@ async def init_db():
             # create ability crews :
             abilitiy_crews = [AbilityCrewCreate(
                 crew_id=0, ability_id=i,
-            ) for i in range(1, 5)]
+            ) for i in range(1, 4)]
             abilitiy_crews = [Ability_Crew.model_validate(i) for i in abilitiy_crews]
 
             # commit abilitiy_crews :

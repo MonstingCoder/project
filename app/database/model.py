@@ -21,10 +21,13 @@ class AbilityCrewCreate(SQLModel):
     )
     ability_id: Literal[
         1, # ability: confirm-payment
-        2, # ability: give-permission
-        3, # ability: manage-account
-        4, # ability: manage-item
+        2, # ability: manage-account
+        3, # ability: manage-item
     ]
+
+class AbilityCrewUpdate(AbilityCrewCreate):
+    crew_id: int | None = None
+    ability_id: Literal[1, 2, 3] | None = None
 
 class Ability_Crew(AbilityCrewCreate, table=True):
     ability_id: int = Field(
@@ -62,9 +65,8 @@ CATATAN :
 class AbilityCreate(SQLModel):
     name: Literal[
         'confirm-payment',  # id: 1
-        'give-permission',  # id: 2
-        'manage-account',   # id: 3
-        'manage-item',      # id: 4
+        'manage-account',   # id: 2
+        'manage-item',      # id: 3
     ]
 
 class Ability(AbilityCreate, table=True):
@@ -94,6 +96,10 @@ class CrewCreate(SQLModel):
         Field(min_length=8),
         AfterValidator(get_password_hash),
     ]
+
+class CrewUpdate(CrewCreate):
+    name: Annotated[str | None, Field(min_length=3)] = None
+    password_hash: Annotated[str | None, Field(min_length=8)] = None
 
 class Crew(CrewCreate, table=True):
     id: int | None = Field(
